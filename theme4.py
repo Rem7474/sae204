@@ -3,6 +3,7 @@
 import subprocess
 import urllib.request
 import json
+import sys
 id_sae=3
 id_grp="b1"
 login="cuvelire"
@@ -47,17 +48,20 @@ def createUsers(data):
             command = "New-ADUser -Name "+user["nom"]+" "+user["prenom"]+" -GivenName "+user["prenom"]+" -Surname "+user["nom"]+" -SamAccountName "+user["login"]+" -UserPrincipalName "+user["email"]+" -AccountPassword (ConvertTo-SecureString -AsPlainText "+user["password"]+" -Force) -Enabled $true -Path 'OU=SAE204,OU=SAE,DC="+user["email"].split("@")[1]+",DC=local'"
             print("user : ",user["nom"],user["prenom"],user["login"],user["email"] )
             result = run(command)
-            #test si le groupe existe déja
-            command= 'Get-ADGroup -Filter {Name -eq"'+user["groupe"]+'"}'
-            result = run(command)
-            #si le groupe n'existe pas on le créer
-            if result.returncode!=0:
-                command=f'New-ADGroup -Name {user["groupe"]} -SamAccountName {user["groupe"]} -GroupCategory Security -GroupScope Global'
-                result=run(command)
-            #ajout des utilisateurs dans les groupes
-            command = "Add-ADGroupMember -Identity "+user["groupe"]+" -Members "+user["login"]
-            result = run(command)
-            print(f'utilisateur {user["nom"]} {user["prenom"]} créer avec succès, il appartient au groupe {user["groupe"]}')
+            if result.returncode == 0:
+                #test si le groupe existe déja
+                command= 'Get-ADGroup -Filter {Name -eq"'+user["groupe"]+'"}'
+                result = run(command)
+                #si le groupe n'existe pas on le créer
+                if result.returncode!=0:
+                    command=f'New-ADGroup -Name {user["groupe"]} -SamAccountName {user["groupe"]} -GroupCategory Security -GroupScope Global'
+                    result=run(command)
+                #ajout des utilisateurs dans les groupes
+                command = "Add-ADGroupMember -Identity "+user["groupe"]+" -Members "+user["login"]
+                result = run(command)
+                print(f'utilisateur {user["nom"]} {user["prenom"]} créer avec succès, il appartient au groupe {user["groupe"]}')
+            else:
+                print(f'Erreur lors de la création de l\'utilisateur {user["nom"]} {user["prenom"]}')
         else:
             print(f'Utilisateur {user["nom"]} {user["prenom"]} déja existant')
 
@@ -65,6 +69,13 @@ def createUsers(data):
 #-----------------------------------------------------------------------------------------------------------------------------
 #Programme Principal
 #-----------------------------------------------------------------------------------------------------------------------------
+#vérification si module ActiveDirectory présent et si l'utilisateur à les permissions
+command = "Get-ADUser -Identity $env:USERNAME"
+result = run(command)
+if result.returncode !=0:
+    print("Le module ActiveDirectory n'est pas installé ou vous n'avez pas les permissions nécessaire pour exécuter ce script")
+    sys.exit(1)
+#récupération des données de l'api
 users=getData(myUrl)
 viewUsers(users)
 nbE,nbG,nomD=statUsers(users)
